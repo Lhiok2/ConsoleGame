@@ -71,7 +71,7 @@ namespace 俄罗斯方块
 
         public void Update()
         {
-            lock (_curSquare)
+            lock (this)
             {
                 _curSquare.Update(this);
             }
@@ -180,7 +180,7 @@ namespace 俄罗斯方块
                 return;
             }
 
-            lock (_curSquare)
+            lock (this)
             {
                 switch (Console.ReadKey(true).Key)
                 {
