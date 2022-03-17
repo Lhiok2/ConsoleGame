@@ -7,10 +7,6 @@ namespace 俄罗斯方块
 {
     class MainScene : IScene
     {
-        private bool _active;
-
-        private Thread _inputCheckThread;
-
         private int _maxCount;
         private List<HashSet<int>> _bricks = new List<HashSet<int>>();
 
@@ -43,25 +39,22 @@ namespace 俄罗斯方块
             }
 
             // 方块绘制
-            _curSquare.Draw();
+            _curSquare?.Draw();
         }
 
         public void Hidden()
         {
-            _active = false;
-            _bricks.Clear();
-            _inputCheckThread = null;
+            InputThread.instance.action -= InputCheck;
 
+            _curSquare = null;
+            _bricks.Clear();
             Console.Clear();
         }
 
         public void Show()
         {
-            Console.Clear();
-
-            _active = true;
+            _curSquare = null;
             Game.instance.score = 0;
-
             _maxCount = (Game.Window_Width >> 1) - 2;
 
             _bricks.Clear();
@@ -71,10 +64,9 @@ namespace 俄罗斯方块
             }
 
             GenerateSquare();
+            Draw();
 
-            _inputCheckThread = new Thread(InputCheck);
-            _inputCheckThread.IsBackground = true;
-            _inputCheckThread.Start();
+            InputThread.instance.action += InputCheck;
         }
 
         public void Update()
@@ -82,42 +74,65 @@ namespace 俄罗斯方块
             lock (_curSquare)
             {
                 _curSquare.Update(this);
-                // 检测方块是否变成砖块
-                BrickCheck();
-                ScoreCheck();
-                Draw();
             }
         }
 
-        private void GenerateSquare()
+        #region 得分检测 检测是否存在可消除的行
+        private void ScoreCheck()
         {
-            _curSquare = GameObjUtil.RandSquare(Game.Window_Width / 2, 0);
-
-            _curSquare.LimitCheck(this);
-            if (!_curSquare.CanMove(E_Limit.All))
+            for (int y = _bricks.Count - 1; y >= 0; --y)
             {
-                Game.instance.scene = E_Scene.Result;
-            }
-        }
-
-        public void BrickCheck()
-        {
-            if (_curSquare.CanMove(E_Limit.Down))
-            {
-                return;
-            }
-            // 当前方块无法继续下落则变成砖块
-            foreach (Vector pos in _curSquare)
-            {
-                if (_bricks.Count > pos.y && pos.y > 0)
+                while (_bricks[y].Count == _maxCount)
                 {
-                    _bricks[pos.y].Add(pos.x);
+                    for (int y2 = 0; y2 < y; ++y2)
+                    {
+                        HashSet<int> tmp = _bricks[y2];
+                        _bricks[y2] = _bricks[y];
+                        _bricks[y] = tmp;
+                    }
+
+                    _bricks[0].Clear();
+                    ++Game.instance.score;
+                    Draw();
+                }
+            }
+        }
+        #endregion
+
+        #region 生成新方块 老方块变成砖块
+        public void GenerateSquare()
+        {
+            // 原方块不为空则变成砖块
+            if (_curSquare != null)
+            {
+                foreach (Vector pos in _curSquare)
+                {
+                    if (_bricks.Count > pos.y && pos.y > 0)
+                    {
+                        _bricks[pos.y].Add(pos.x);
+                    }
                 }
             }
 
-            GenerateSquare();
-        }
+            _curSquare = GameObjUtil.RandSquare(Game.Window_Width / 2, 0);
+            Draw();
 
+            // 方块消除
+            ScoreCheck();
+
+            // 新生成的方块进行一次检测 如果与砖块重合则判定为游戏结束
+            foreach (Vector pos in _curSquare)
+            {
+                if (HasBrick(pos))
+                {
+                    Game.instance.scene = E_Scene.Result;
+                    return;
+                }
+            }
+        }
+        #endregion
+
+        #region 移动限制检测
         public int CheckLimit(Vector pos)
         {
             int res = 0;
@@ -143,7 +158,9 @@ namespace 俄罗斯方块
             }
             return res;
         }
+        #endregion
 
+        #region 检测某个位置是否有方块 除上方越界外其它越界均判定为true
         public bool HasBrick(Vector pos)
         {
             if (pos.x < 2 || pos.x + 4 > Game.Window_Width || pos.y >= _bricks.Count)
@@ -153,62 +170,40 @@ namespace 俄罗斯方块
 
             return pos.y >= 0 && _bricks[pos.y].Contains(pos.x);
         }
-
-        private void ScoreCheck()
-        {
-            for (int y = _bricks.Count - 1; y >= 0; --y)
-            {
-                while (_bricks[y].Count == _maxCount)
-                {
-                    for (int y2 = 0; y2 < y; ++y2)
-                    {
-                        HashSet<int> tmp = _bricks[y2];
-                        _bricks[y2] = _bricks[y];
-                        _bricks[y] = tmp;
-                    }
-
-                    _bricks[0].Clear();
-                    ++Game.instance.score;
-                }
-            }
-        }
+        #endregion
 
         #region 输入检测
         private void InputCheck()
         {
-            while (_active)
+            if (!Console.KeyAvailable)
+            {
+                return;
+            }
+
+            lock (_curSquare)
             {
                 switch (Console.ReadKey(true).Key)
                 {
                     case ConsoleKey.A:
                     case ConsoleKey.LeftArrow:
-                        lock (_curSquare)
-                        {
-                            _curSquare.MoveToLeft();
-                        }
+                        _curSquare.MoveLeft(this);
                         break;
                     case ConsoleKey.D:
                     case ConsoleKey.RightArrow:
-                        lock (_curSquare)
-                        {
-                            _curSquare.MoveToRight();
-                        }
+                        _curSquare.MoveRight(this);
                         break;
                     case ConsoleKey.W:
-                    case ConsoleKey.S:
                     case ConsoleKey.UpArrow:
-                    case ConsoleKey.DownArrow:
                     case ConsoleKey.J:
                     case ConsoleKey.Enter:
-                        lock (_curSquare)
-                        {
-                            _curSquare.LimitCheck(this);
-                            _curSquare.TakeTrans();
-                            _curSquare.LimitCheck(this);
-                            BrickCheck();
-                        }
+                        _curSquare.TakeTrans(this);
+                        break;
+                    case ConsoleKey.S:
+                    case ConsoleKey.DownArrow:
+                        _curSquare.MoveDown(this);
                         break;
                 }
+
             }
         }
         #endregion

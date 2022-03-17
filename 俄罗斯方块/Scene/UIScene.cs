@@ -13,9 +13,6 @@ namespace 俄罗斯方块
 
         private int _selectedIndex;
 
-        private Thread _inputCheckThread;
-        private bool _active;
-
         #region 接口逻辑
         public virtual void Draw()
         {
@@ -33,50 +30,50 @@ namespace 俄罗斯方块
 
         public virtual void Hidden()
         {
-            _active = false;
-            _inputCheckThread = null;
-
+            InputThread.instance.action -= InputCheck;
             Console.Clear();
         }
 
         public virtual void Show()
         {
-            _active = true;
             _selectedIndex = 0;
-            _inputCheckThread = new Thread(InputCheck);
-            _inputCheckThread.IsBackground = true;
-            _inputCheckThread.Start();
+            Draw();
+
+            InputThread.instance.action += InputCheck;
         }
 
         public virtual void Update()
         {
-            Draw();
         }
         #endregion
 
         #region 输入检测
         private void InputCheck()
         {
-            while (_active)
+            if (!Console.KeyAvailable)
             {
-                switch (Console.ReadKey(true).Key)
-                {
-                    case ConsoleKey.W:
-                    case ConsoleKey.UpArrow:
-                        _selectedIndex = 0;
-                        break;
-                    case ConsoleKey.S:
-                    case ConsoleKey.DownArrow:
-                        _selectedIndex = 1;
-                        break;
-                    case ConsoleKey.Enter:
-                    case ConsoleKey.J:
-                        if (_selectedIndex == 0)
-                            OptionFirst();
-                        else
-                            OptionSecond();
-                        break;
-                }
+                return;
+            }
+
+            switch (Console.ReadKey(true).Key)
+            {
+                case ConsoleKey.W:
+                case ConsoleKey.UpArrow:
+                    _selectedIndex = 0;
+                    Draw();
+                    break;
+                case ConsoleKey.S:
+                case ConsoleKey.DownArrow:
+                    _selectedIndex = 1;
+                    Draw();
+                    break;
+                case ConsoleKey.Enter:
+                case ConsoleKey.J:
+                    if (_selectedIndex == 0)
+                        OptionFirst();
+                    else
+                        OptionSecond();
+                    break;
             }
         }
         #endregion

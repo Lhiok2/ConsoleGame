@@ -8,11 +8,11 @@ namespace 俄罗斯方块
     {
         public override void Show()
         {
-            base.Show();
-
             titleName = "俄罗斯方块";
             optionNameFirst = "开始游戏";
             optionNameSecond = "退出游戏";
+
+            base.Show();
         }
 
         protected override void OptionFirst()

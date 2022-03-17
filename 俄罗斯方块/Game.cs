@@ -16,8 +16,8 @@ namespace 俄罗斯方块
         private void Init()
         {
             Console.CursorVisible = false;
-            Console.SetWindowSize(Window_Width, Window_Height);
-            Console.SetBufferSize(Window_Width, Window_Height);
+            Console.SetWindowSize(Window_Width + 1, Window_Height + 1);
+            Console.SetBufferSize(Window_Width + 1, Window_Height + 1);
 
             scene = E_Scene.Start;
         }
